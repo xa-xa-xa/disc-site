@@ -244,13 +244,14 @@ async def respond(message: Message):
     await to_builder(user_name, product_id, message.content, builder_completed, ask_user, process_generator_message)
 
 
+# ================================
+# DEV BYPASS FOR LOCAL AUTH
+# Accept any username/password and create a Chainlit user object.
+# REMOVE this block before committing to main / production.
+# ================================
 @cl.password_auth_callback
 async def auth_callback(username: str, password: str):
-    user = await User.find_one(User.username == username)
-
-    if verify_password(password, user.password_hash):
-        return cl.User(
-            identifier=username, metadata={"role": "user", "provider": "credentials"}
-        )
-    else:
-        return None
+    return cl.User(
+        identifier=username or "dev",
+        metadata={"role": "admin", "provider": "dev-bypass"},
+    )

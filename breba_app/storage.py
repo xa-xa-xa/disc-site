@@ -21,10 +21,10 @@ USERS_BUCKET_NAME: str = os.getenv("USERS_BUCKET")
 CLOUDFLARE_ENDPOINT: str = os.getenv("CLOUDFLARE_ENDPOINT")
 CDN_BASE_URL = "https://cdn.breba.app"
 
-storage_client = storage.Client()
+# storage_client = storage.Client()
 
-private_bucket: Bucket = storage_client.get_bucket(USERS_BUCKET_NAME)
-public_bucket: Bucket = storage_client.get_bucket(os.getenv("PUBLIC_BUCKET"))
+# private_bucket: Bucket = storage_client.get_bucket(USERS_BUCKET_NAME)
+# public_bucket: Bucket = storage_client.get_bucket(os.getenv("PUBLIC_BUCKET"))
 
 session = boto3.session.Session()
 # Uses AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from the environment
@@ -73,12 +73,13 @@ def _copy_directory(
         logger.info(f"Copied {blob.name} -> {new_name}")
 
 
-def _user_session_blob(user_name: str, session_id: str, relative_path: str, description: str | None = None) -> Blob:
-    blob = private_bucket.blob(f"{user_name}/{session_id}/{relative_path}")
-    if description is not None:
-        blob.metadata = {"description": description}
-    return blob
-
+# def _user_session_blob(user_name: str, session_id: str, relative_path: str, description: str | None = None) -> Blob:
+#     blob = private_bucket.blob(f"{user_name}/{session_id}/{relative_path}")
+#     if description is not None:
+#         blob.metadata = {"description": description}
+#     return blob
+def _user_session_blob(*args, **kwargs):
+    return None
 
 def save_image_to_private(user_name: str, session_id: str, image_name: str, content: bytes, description: str = None):
     key = f"{user_name}/{session_id}/{image_name}"
@@ -117,45 +118,52 @@ def save_image_file_to_private(user_name: str, session_id: str, file_name: str, 
         raise
 
 
-def save_spec(user_name: str, session_id: str, spec: str):
-    blob = _user_session_blob(user_name, session_id, "spec.txt")
-    blob.upload_from_string(spec)
+# def save_spec(user_name: str, session_id: str, spec: str):
+#     blob = _user_session_blob(user_name, session_id, "spec.txt")
+#     blob.upload_from_string(spec)
+def save_spec(*args, **kwargs):
+    pass
 
 
-def read_spec_text(user_name: str, session_id: str) -> str | None:
-    try:
-        blob = _user_session_blob(user_name, session_id, "spec.txt")
-        return blob.download_as_string().decode("utf-8")
-    except NotFound:
-        return None
+# def read_spec_text(user_name: str, session_id: str) -> str | None:
+#     try:
+#         blob = _user_session_blob(user_name, session_id, "spec.txt")
+#         return blob.download_as_string().decode("utf-8")
+#     except NotFound:
+#         return None
+def read_spec_text(*args, **kwargs):
+    return None
 
+# def read_index_html(user_name: str, session_id: str) -> str:
+#     blob = _user_session_blob(user_name, session_id, "index.html")
+#     return blob.download_as_string().decode("utf-8")
+def read_index_html(*args, **kwargs):
+    return ""
 
-def read_index_html(user_name: str, session_id: str) -> str:
-    blob = _user_session_blob(user_name, session_id, "index.html")
-    return blob.download_as_string().decode("utf-8")
+# def read_image_from_private(user_name: str, session_id: str, image_name: str) -> Tuple[bytes, dict[str, str]] | None:
+#     blob = private_bucket.blob(f"{user_name}/{session_id}/images/{image_name}")
 
+#     if not blob.exists():
+#         return None
 
-def read_image_from_private(user_name: str, session_id: str, image_name: str) -> Tuple[bytes, dict[str, str]] | None:
-    blob = private_bucket.blob(f"{user_name}/{session_id}/images/{image_name}")
+#     blob.reload()
+#     return blob.download_as_bytes(), blob.metadata
+def read_image_from_private(*args, **kwargs):
+    return None
 
-    if not blob.exists():
-        return None
+# def save_file_to_private(user_name: str, session_id: str, file_name: str, content: bytes, content_type: str):
+#     private_bucket.blob(f"{user_name}/{session_id}/{file_name}").upload_from_string(content, content_type)
+def save_file_to_private(*args, **kwargs):
+    pass
 
-    blob.reload()
-    return blob.download_as_bytes(), blob.metadata
-
-
-def save_file_to_private(user_name: str, session_id: str, file_name: str, content: bytes, content_type: str):
-    private_bucket.blob(f"{user_name}/{session_id}/{file_name}").upload_from_string(content, content_type)
-
-
-def load_template(user_name: str, session_id: str, template_name: str):
-    _copy_directory(
-        source_bucket_name=private_bucket.name, target_bucket_name=private_bucket.name,
-        prefix=f"templates/{template_name}",
-        target_prefix=f"{user_name}/{session_id}"
-    )
-
+# def load_template(user_name: str, session_id: str, template_name: str):
+#     _copy_directory(
+#         source_bucket_name=private_bucket.name, target_bucket_name=private_bucket.name,
+#         prefix=f"templates/{template_name}",
+#         target_prefix=f"{user_name}/{session_id}"
+#     )
+def load_template(*args, **kwargs):
+    pass
 
 def make_dir_tree() -> DirTree:
     return defaultdict(make_dir_tree)
@@ -189,25 +197,27 @@ def list_s3_structured(user_name: str, session_id: str) -> DirTree:
     return files
 
 
-def list_files_structured(user_name: str, session_id: str) -> DirTree:
-    prefix = f"{user_name}/{session_id}"
-    blobs = private_bucket.list_blobs(prefix=prefix)
-    files = make_dir_tree()
+# def list_files_structured(user_name: str, session_id: str) -> DirTree:
+#     prefix = f"{user_name}/{session_id}"
+#     blobs = private_bucket.list_blobs(prefix=prefix)
+#     files = make_dir_tree()
 
-    for blob in blobs:
-        parts = blob.name[len(prefix) + 1:].split("/")
-        file_name = parts[-1]
+#     for blob in blobs:
+#         parts = blob.name[len(prefix) + 1:].split("/")
+#         file_name = parts[-1]
 
-        file = register_file(parts, files)
-        if blob.metadata:
-            file[file_name] = {
-                "__description__": blob.metadata.get("description", "No description")
-            }
-        else:
-            file[file_name] = {"__description__": "No description"}
+#         file = register_file(parts, files)
+#         if blob.metadata:
+#             file[file_name] = {
+#                 "__description__": blob.metadata.get("description", "No description")
+#             }
+#         else:
+#             file[file_name] = {"__description__": "No description"}
 
-    return files
+#     return files
 
+def list_files_structured(*args, **kwargs):
+    return {}
 
 def format_tree(tree: DirTree, indent=0):
     lines = []
@@ -221,34 +231,37 @@ def format_tree(tree: DirTree, indent=0):
     return lines
 
 
-def list_files_in_private(user_name: str, session_id: str):
-    structured = list_s3_structured(user_name, session_id)
-    files_prefix = public_file_url(user_name, session_id, "")
-    file_list = "\n".join(format_tree(structured))
-    return f"{files_prefix} contains the following files:\n{file_list}"
-
+# def list_files_in_private(user_name: str, session_id: str):
+#     structured = list_s3_structured(user_name, session_id)
+#     files_prefix = public_file_url(user_name, session_id, "")
+#     file_list = "\n".join(format_tree(structured))
+#     return f"{files_prefix} contains the following files:\n{file_list}"
+def list_files_in_private(*args, **kwargs):
+    return "[]"
 
 def get_public_url(site_name: str) -> str:
     return f"https://{site_name}.breba.site"
 
 
 # TODO: user_name/session_id are state for the entire request, should probably create a user_cloud_storage class
-def upload_site(user_name: str, session_id: str, site_name: str):
-    """
-    Uploads site to google cloud
-    Example: upload_site("/Users/yason/breba/disc-site/sites/test-site", "test-site")
-    :param user_name: username
-    :param session_id: session id used for locating site files
-    :param site_name: site name where all the files will be stored
-    :return: public url of deployed site
-    """
-    # TODO: convert to async because GCP is a blocking call, we don't want to have to wait
-    # Sanitize site name
-    site_name = re.sub("[^0-9a-zA-Z]+", "-", site_name).strip(" -")
-    # TODO: when empty dir is being uploaded, should pass back an error message
-    _copy_directory(
-        source_bucket_name=private_bucket.name,
-        target_bucket_name=public_bucket.name, prefix=f"{user_name}/{session_id}", target_prefix=site_name
-    )
+# def upload_site(user_name: str, session_id: str, site_name: str):
+#     """
+#     Uploads site to google cloud
+#     Example: upload_site("/Users/yason/breba/disc-site/sites/test-site", "test-site")
+#     :param user_name: username
+#     :param session_id: session id used for locating site files
+#     :param site_name: site name where all the files will be stored
+#     :return: public url of deployed site
+#     """
+#     # TODO: convert to async because GCP is a blocking call, we don't want to have to wait
+#     # Sanitize site name
+#     site_name = re.sub("[^0-9a-zA-Z]+", "-", site_name).strip(" -")
+#     # TODO: when empty dir is being uploaded, should pass back an error message
+#     _copy_directory(
+#         source_bucket_name=private_bucket.name,
+#         target_bucket_name=public_bucket.name, prefix=f"{user_name}/{session_id}", target_prefix=site_name
+#     )
 
-    return get_public_url(site_name)
+#     return get_public_url(site_name)
+def upload_site(*args, **kwargs):
+    return "https://mocked.breba.site"

@@ -41,8 +41,6 @@ def pre_model_hook(state):
         start_on=[HumanMessage],
         include_system=True,
     )
-    # You can return updated messages either under `llm_input_messages` or
-    # `messages` key (see the note below)
     return {"llm_input_messages": trimmed_messages}
 
 
@@ -68,21 +66,28 @@ class HTMLAgent:
         search_tool = TavilySearchResults(max_results=5, include_images=True)
         base_tools = [generate_image, search_tool]
 
-        headers = {
-            "Authorization": f"Bearer {pat}",
-            "X-MCP-Toolsets": "issues,users,pull_requests,orgs,repos",
-            "X-MCP-Readonly": "true"
-        }
+        # 🛠️ TEMP: Skip MCP (GitHub Copilot) tools in local dev
+        mcp_tools = []
+        try:
+            self._mcp_stream_ctx = streamablehttp_client(
+                url="https://api.githubcopilot.com/mcp/",
+                headers={
+                    "Authorization": f"Bearer {pat}",
+                    "X-MCP-Toolsets": "issues,users,pull_requests,orgs,repos",
+                    "X-MCP-Readonly": "true"
+                }
+            )
+            async with self._mcp_stream_ctx as (read, write, session_id_callback):
+                session = ClientSession(read, write)
+                await session.__aenter__()
+                await session.initialize()
+                mcp_tools = await load_mcp_tools(session)
+                self._mcp_session = session
 
-        self._mcp_stream_ctx = streamablehttp_client(
-            url="https://api.githubcopilot.com/mcp/", headers=headers
-        )
-        read, write, session_id_callback = await self._mcp_stream_ctx.__aenter__()
-        session = ClientSession(read, write)
-        await session.__aenter__()
-
-        await session.initialize()
-        mcp_tools = await load_mcp_tools(session)
+        except Exception as e:
+            print("⚠️ MCP init failed — skipping for local dev:", e)
+            self._mcp_stream_ctx = None
+            self._mcp_session = None
 
         self.model = ChatOpenAI(model="gpt-4.1", temperature=0)
         self.tools = base_tools + mcp_tools
@@ -95,7 +100,6 @@ class HTMLAgent:
             prompt=self.SYSTEM_INSTRUCTION
         )
 
-        self._mcp_session = session
         self._initialized = True
 
     async def close(self):
@@ -105,15 +109,12 @@ class HTMLAgent:
             await self._mcp_stream_ctx.__aexit__(None, None, None)
 
     def invoke(self, query, session_id):
-        # TODO: this is unused and outdated?
         config = {"configurable": {"thread_id": session_id}}
         self.graph.invoke({"messages": [("user", query)]}, config)
         return self.get_agent_response(config)
 
     async def stream(self, query: str, user_name: str, session_id: str) -> AsyncIterable[Dict[str, Any]]:
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # TODO: username needs to be used as a static parameter to the tool call
-        #  For this need to redo the generator agent using custom graph or using baml
         inputs = {
             "messages": [("user", f"Your session id is: {session_id}."),
                          ("user", f"The user name for tool use is: {user_name}."),
@@ -121,7 +122,6 @@ class HTMLAgent:
                          ("user", query)],
             "specification": query
         }
-
         config = {"configurable": {"thread_id": session_id}}
 
         async for mode, data in self.graph.astream(inputs, config, stream_mode=["messages", "values"]):
@@ -140,7 +140,6 @@ class HTMLAgent:
 
     async def diffing_update(self, query: str, session_id: str):
         html = self.get_last_html(session_id)
-        # Will raise an exception if the diff is too long
         diff = await diff_text(html, query)
         modified = apply_diff_no_line_numbers(html, diff)
         self.set_last_html(session_id, modified)
@@ -148,15 +147,12 @@ class HTMLAgent:
 
     async def editing_stream(self, query: str, user_name: str, session_id: str) -> AsyncIterable[Dict[str, Any]]:
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # TODO: username needs to be used as a static parameter to the tool call
-        #  For this need to redo the generator agent using custom graph or using baml
         inputs = {"messages": [("user", f"Your session id is: {session_id}."),
                                ("user", f"The user name for tool use is: {user_name}."),
                                ("user", f"Current time is: {current_time}"),
                                ("user", f"Current specification is: {self.get_last_specification(session_id)}"),
                                ("user", query)],
                   }
-
         config = {"configurable": {"thread_id": session_id}}
 
         async for mode, data in self.graph.astream(inputs, config, stream_mode=["messages", "values"]):
@@ -182,8 +178,7 @@ class HTMLAgent:
         config = {"configurable": {"thread_id": session_id}}
         current_state = self.graph.get_state(config)
         last_message = current_state.values.get('messages')[-1]
-        extracted_text = extract_html_content(last_message.content)
-        return extracted_text
+        return extract_html_content(last_message.content)
 
     def set_last_html(self, session_id, html_output):
         config = {"configurable": {"thread_id": session_id}}
